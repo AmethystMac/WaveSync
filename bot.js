@@ -1,31 +1,73 @@
-import Discord from "discord.js"
-import { joinVoiceChannel } from "@discordjs/voice";
+import Discord from "discord.js";
+import ytdl from "ytdl-core";
+import OpusScript from "opusscript";
+
+import BotToken from "./data/BotToken.json" assert { type: "json" }; // Modify the import to suit your application
 
 const client = new Discord.Client({ intents: ["Guilds", "GuildMessages", "MessageContent"] });
-const TOKEN = ""
+const TOKEN = BotToken.token;
+
+let servers = {};
 
 client.on("ready", () => {
-    console.log(`Logged in as ${client.user.tag}.`);
+    console.log(`\nLogged in as ${client.user.tag}.`);
 });
 
-client.on("messageCreate", msg => {
-    if(msg.author.bot) return;
+client.on("messageCreate", message => {
+    if(message.author.bot) return;
 
-    console.log(msg);
+    const args = message.content.split(" ");
 
-    if(msg.content === "ping") {
-        msg.reply("pong");
-    }
+    switch(args[0]) {
+        case "#ping": 
+            message.reply("pong");
 
-    if(msg.content === "#play") {
-        const connection = joinVoiceChannel({
+        case "#play":
+
+            const play = (connection, message) => {
+                let server = servers[message.guild.id];
+
+                server.dispatcher = connection.playStream(ytdl(server.queue[0], { filter: "audioonly" }));
+
+                server.queue.shift();
+
+                server.dispatcher.on("end", () => {
+                    if(server.queue[0]) {
+                        play(connection, message);
+                    } else {
+                        connection.disconnect();
+                    }
+                })
+            }
+
+            if(!args[1]) {
+                message.channel.send("Type the goddamn song name");
+                return;
+            }
+
+            // Checking if the user is connected to a voice channel
+            if(!message.member.voiceChannel) {
+                console.log(message.member.voice.channel);
+                message.channel.send("Join a freakin voice channel bitch");
+                return;
+            }
+
+            // Checking if the queue exists
+            if(!servers[message.guild.id])
+                servers[message.guild.id] = {
+                    queue: []
+                }
             
-        })
-    }
+            // Getting the user server
+            let server = servers[message.guild.id];
 
-    // if(msg.content === "bow before me" && msg.author.username === "AmethystMac") {
-    //     msg.reply("ALL HAIL MATTHEW!")
-    // }
+            if(!message.guild.voiceConnection)
+                message.member.voiceChannel.join().then(connection => {
+                    play(connection, message);  
+                })
+
+        break;
+    }
 });
 
 client.login(TOKEN)

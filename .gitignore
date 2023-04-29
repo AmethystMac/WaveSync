@@ -1,1 +1,4 @@
 node_modules
+songs
+data
+ec2-test-server-keypair.pem
