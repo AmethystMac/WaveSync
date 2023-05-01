@@ -1,73 +1,40 @@
-import Discord from "discord.js";
-import ytdl from "ytdl-core";
-import OpusScript from "opusscript";
+import { Client } from "discord.js";
+import { DisTube } from "distube";
 
-import BotToken from "./data/BotToken.json" assert { type: "json" }; // Modify the import to suit your application
+import BotToken from "./data/BotToken.json" assert { type: "json" };
 
-const client = new Discord.Client({ intents: ["Guilds", "GuildMessages", "MessageContent"] });
-const TOKEN = BotToken.token;
+const client = new Client({ intents: [ "Guilds", "GuildMessages", "GuildVoiceStates", "MessageContent" ] });
 
-let servers = {};
+client.DisTube = new DisTube(client, {
+    leaveOnStop: false,
+    emitNewSongOnly: true,
+    emitAddSongWhenCreatingQueue: false,
+    emitAddListWhenCreatingQueue: false,
+})
 
-client.on("ready", () => {
-    console.log(`\nLogged in as ${client.user.tag}.`);
+client.on("ready", client => {
+    console.log(`\nLogged in as ${client.user.tag}.\n`);
 });
 
 client.on("messageCreate", message => {
-    if(message.author.bot) return;
+    if(message.author.bot || !message.guild) return;
 
-    const args = message.content.split(" ");
+    const prefix = "#";
+    if(!message.content.toLowerCase().startsWith(prefix)) return;
 
-    switch(args[0]) {
-        case "#ping": 
-            message.reply("pong");
+    const args = message.content.slice(prefix.length).trim().split(/ +/g);
 
-        case "#play":
-
-            const play = (connection, message) => {
-                let server = servers[message.guild.id];
-
-                server.dispatcher = connection.playStream(ytdl(server.queue[0], { filter: "audioonly" }));
-
-                server.queue.shift();
-
-                server.dispatcher.on("end", () => {
-                    if(server.queue[0]) {
-                        play(connection, message);
-                    } else {
-                        connection.disconnect();
-                    }
-                })
-            }
-
-            if(!args[1]) {
-                message.channel.send("Type the goddamn song name");
-                return;
-            }
-
-            // Checking if the user is connected to a voice channel
-            if(!message.member.voiceChannel) {
-                console.log(message.member.voice.channel);
-                message.channel.send("Join a freakin voice channel bitch");
-                return;
-            }
-
-            // Checking if the queue exists
-            if(!servers[message.guild.id])
-                servers[message.guild.id] = {
-                    queue: []
-                }
-            
-            // Getting the user server
-            let server = servers[message.guild.id];
-
-            if(!message.guild.voiceConnection)
-                message.member.voiceChannel.join().then(connection => {
-                    play(connection, message);  
-                })
-
-        break;
+    if(args.shift().toLowerCase() === "play") {
+        client.DisTube.play(message.member.voice.channel, args.join(" "), {
+            member: message.member,
+            textChannel: message.channel,
+            message
+        })
     }
 });
 
-client.login(TOKEN)
+client.DisTube.on("playSong", (queue, song) => {
+    queue.textChannel.send("Now playing " + song.name);
+})
+
+client.login(BotToken.token);
