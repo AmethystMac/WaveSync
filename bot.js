@@ -28,13 +28,16 @@ client.on("messageCreate", message => {
         client.DisTube.play(message.member.voice.channel, args.join(" "), {
             member: message.member,
             textChannel: message.channel,
-            message
+            message,
         })
     }
 });
 
 client.DisTube.on("playSong", (queue, song) => {
+    console.log("Now playing " + song.name);
     queue.textChannel.send("Now playing " + song.name);
+    queue.voice.setSelfDeaf(false);
+    queue.voice.setSelfMute(false);
 })
 
 client.login(BotToken.token);
